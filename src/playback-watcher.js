@@ -382,14 +382,18 @@ export default class PlaybackWatcher {
    * @private
    */
   waiting_() {
+    console.warn('DEBUG: waiting...');
     if (this.techWaiting_()) {
       return;
     }
 
     // All tech waiting checks failed. Use last resort correction
     const currentTime = this.tech_.currentTime();
+    console.warn('DEBUG: currentTime: ', currentTime);
     const buffered = this.tech_.buffered();
+    console.warn('DEBUG: buffered: ', buffered);
     const currentRange = Ranges.findRange(buffered, currentTime);
+    console.warn('DEBUG: currentRange: ', currentRange);
 
     // Sometimes the player can stall for unknown reasons within a contiguous buffered
     // region with no indication that anything is amiss (seen in Firefox). Seeking to
@@ -399,15 +403,18 @@ export default class PlaybackWatcher {
     // until there is ~ 3 seconds of forward buffer available. PlaybackWatcher should also
     // make sure there is ~3 seconds of forward buffer before taking any corrective action
     // to avoid triggering an `unknownwaiting` event when the network is slow.
+    console.warn('DEBUG: checking if we should trigger an error:', currentRange.length, currentTime + 3, currentRange.end(0));
     if (currentRange.length && currentTime + 3 <= currentRange.end(0)) {
       this.cancelTimer_();
+      console.warn('DEBUG: seeking to current time to try to resolve error: ', currentRange);
       this.tech_.setCurrentTime(currentTime);
 
-      this.logger_(`Stopped at ${currentTime} while inside a buffered region ` +
+      console.warn(`DEBUG: stopped at ${currentTime} while inside a buffered region ` +
         `[${currentRange.start(0)} -> ${currentRange.end(0)}]. Attempting to resume ` +
         'playback by seeking to the current time.');
 
       // unknown waiting corrections may be useful for monitoring QoS
+      console.warn('DEBUG: triggering unknown-waiting events');
       this.tech_.trigger({type: 'usage', name: 'vhs-unknown-waiting'});
       this.tech_.trigger({type: 'usage', name: 'hls-unknown-waiting'});
       return;
