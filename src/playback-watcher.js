@@ -155,11 +155,22 @@ export default class PlaybackWatcher {
   }
 
   /**
+   * DEBUG LOGGING FUNCTION
+   *
+   * @private
+   */
+  simpleLog(msg) {
+    // eslint-disable-next-line
+    console.warn(`DEBUG: ${msg}`)
+  }
+
+  /**
    * Periodically check current time to see if playback stopped
    *
    * @private
    */
   monitorCurrentTime_() {
+    this.simpleLog("monitorCurrentTime_");
     this.checkCurrentTime_();
 
     if (this.checkCurrentTimeTimeout_) {
@@ -253,18 +264,27 @@ export default class PlaybackWatcher {
    * @private
    */
   checkCurrentTime_() {
+    this.simpleLog("checkCurrentTime_");
     if (this.tech_.seeking() && this.fixesBadSeeks_()) {
+      this.simpleLog("seeking and fixesBadSeeks");
       this.consecutiveUpdates = 0;
       this.lastRecordedTime = this.tech_.currentTime();
+      this.simpleLog(`setting lastRecordedTime: ${this.tech_.currentTime()}`);
       return;
     }
 
     if (this.tech_.paused() || this.tech_.seeking()) {
+      this.simpleLog(`paused or seeking`);
       return;
     }
 
     const currentTime = this.tech_.currentTime();
     const buffered = this.tech_.buffered();
+
+    this.simpleLog(`currentTime: ${currentTime}`);
+    this.simpleLog(`lastRecordedTime: ${this.lastRecordedTime}`);
+    this.simpleLog(`buffered end: ${buffered.end(buffered.length - 1)}`);
+    this.simpleLog(`SAFE_TIME_DELTA: ${Ranges.SAFE_TIME_DELTA}`);
 
     if (this.lastRecordedTime === currentTime &&
         (!buffered.length ||
@@ -382,18 +402,14 @@ export default class PlaybackWatcher {
    * @private
    */
   waiting_() {
-    console.warn('DEBUG: waiting...');
     if (this.techWaiting_()) {
       return;
     }
 
     // All tech waiting checks failed. Use last resort correction
     const currentTime = this.tech_.currentTime();
-    console.warn('DEBUG: currentTime: ', currentTime);
     const buffered = this.tech_.buffered();
-    console.warn('DEBUG: buffered: ', buffered);
     const currentRange = Ranges.findRange(buffered, currentTime);
-    console.warn('DEBUG: currentRange: ', currentRange);
 
     // Sometimes the player can stall for unknown reasons within a contiguous buffered
     // region with no indication that anything is amiss (seen in Firefox). Seeking to
@@ -403,18 +419,11 @@ export default class PlaybackWatcher {
     // until there is ~ 3 seconds of forward buffer available. PlaybackWatcher should also
     // make sure there is ~3 seconds of forward buffer before taking any corrective action
     // to avoid triggering an `unknownwaiting` event when the network is slow.
-    console.warn('DEBUG: checking if we should trigger an error:', currentRange.length, currentTime + 3, currentRange.end(0));
     if (currentRange.length && currentTime + 3 <= currentRange.end(0)) {
       this.cancelTimer_();
-      console.warn('DEBUG: seeking to current time to try to resolve error: ', currentRange);
       this.tech_.setCurrentTime(currentTime);
 
-      console.warn(`DEBUG: stopped at ${currentTime} while inside a buffered region ` +
-        `[${currentRange.start(0)} -> ${currentRange.end(0)}]. Attempting to resume ` +
-        'playback by seeking to the current time.');
-
       // unknown waiting corrections may be useful for monitoring QoS
-      console.warn('DEBUG: triggering unknown-waiting events');
       this.tech_.trigger({type: 'usage', name: 'vhs-unknown-waiting'});
       this.tech_.trigger({type: 'usage', name: 'hls-unknown-waiting'});
       return;
@@ -430,24 +439,31 @@ export default class PlaybackWatcher {
    * @private
    */
   techWaiting_() {
+    this.simpleLog('techWaiting_');
     const seekable = this.seekable();
     const currentTime = this.tech_.currentTime();
 
     if (this.tech_.seeking() && this.fixesBadSeeks_()) {
       // Tech is seeking or bad seek fixed, no action needed
+      this.simpleLog('Tech is seeking or bad seek fixed, no action needed');
       return true;
     }
 
     if (this.tech_.seeking() || this.timer_ !== null) {
       // Tech is seeking or already waiting on another action, no action needed
+      this.simpleLog('Tech is seeking or already waiting on another action, no action needed');
       return true;
     }
 
     if (this.beforeSeekableWindow_(seekable, currentTime)) {
+      this.simpleLog('beforeSeekableWindow_');
       const livePoint = seekable.end(seekable.length - 1);
 
       this.logger_(`Fell out of live window at time ${currentTime}. Seeking to ` +
                    `live point (seekable end) ${livePoint}`);
+      this.simpleLog(`Fell out of live window at time ${currentTime}. Seeking to ` +
+                   `live point (seekable end) ${livePoint}`);
+      
       this.cancelTimer_();
       this.tech_.setCurrentTime(livePoint);
 
@@ -466,6 +482,7 @@ export default class PlaybackWatcher {
     });
 
     if (videoUnderflow) {
+      this.simpleLog('videoUnderflow');
       // Even though the video underflowed and was stuck in a gap, the audio overplayed
       // the gap, leading currentTime into a buffered range. Seeking to currentTime
       // allows the video to catch up to the audio position without losing any audio
@@ -482,9 +499,12 @@ export default class PlaybackWatcher {
 
     // check for gap
     if (nextRange.length > 0) {
+      this.simpleLog('check gap');
       const difference = nextRange.start(0) - currentTime;
 
       this.logger_(`Stopped at ${currentTime}, setting timer for ${difference}, seeking ` +
+        `to ${nextRange.start(0)}`);
+      this.simpleLog(`Stopped at ${currentTime}, setting timer for ${difference}, seeking ` +
         `to ${nextRange.start(0)}`);
 
       this.cancelTimer_();
@@ -496,6 +516,9 @@ export default class PlaybackWatcher {
       );
       return true;
     }
+
+
+    this.simpleLog('was unable to correct the waiting issue');
 
     // All checks failed. Returning false to indicate failure to correct waiting
     return false;
