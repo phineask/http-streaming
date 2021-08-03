@@ -88,7 +88,7 @@ export default class PlaybackWatcher {
 
     const playHandler = () => this.monitorCurrentTime_();
     const canPlayHandler = () => this.monitorCurrentTime_();
-    const waitingHandler = () => this.techWaiting_();
+    const waitingHandler = () => this.techWaiting_('from waitingHandler');
     const cancelTimerHandler = () => this.cancelTimer_();
     const fixesBadSeeksHandler = () => this.fixesBadSeeks_();
 
@@ -170,7 +170,6 @@ export default class PlaybackWatcher {
    * @private
    */
   monitorCurrentTime_() {
-    this.simpleLog("monitorCurrentTime_");
     this.checkCurrentTime_();
 
     if (this.checkCurrentTimeTimeout_) {
@@ -264,7 +263,6 @@ export default class PlaybackWatcher {
    * @private
    */
   checkCurrentTime_() {
-    this.simpleLog("checkCurrentTime_");
     if (this.tech_.seeking() && this.fixesBadSeeks_()) {
       this.simpleLog("seeking and fixesBadSeeks");
       this.consecutiveUpdates = 0;
@@ -281,20 +279,15 @@ export default class PlaybackWatcher {
     const currentTime = this.tech_.currentTime();
     const buffered = this.tech_.buffered();
 
-    this.simpleLog(`currentTime: ${currentTime}`);
-    this.simpleLog(`lastRecordedTime: ${this.lastRecordedTime}`);
-    this.simpleLog(`buffered end: ${buffered.end(buffered.length - 1)}`);
-    this.simpleLog(`SAFE_TIME_DELTA: ${Ranges.SAFE_TIME_DELTA}`);
-
     if (this.lastRecordedTime === currentTime &&
         (!buffered.length ||
-         currentTime + Ranges.SAFE_TIME_DELTA >= buffered.end(buffered.length - 1))) {
+         currentTime + Ranges.SAFE_TIME_DELTA >= buffered.end(buffered.length - 1))) {      
       // If current time is at the end of the final buffered region, then any playback
       // stall is most likely caused by buffering in a low bandwidth environment. The tech
       // should fire a `waiting` event in this scenario, but due to browser and tech
       // inconsistencies. Calling `techWaiting_` here allows us to simulate
       // responding to a native `waiting` event when the tech fails to emit one.
-      return this.techWaiting_();
+      return this.techWaiting_('from checkCurrentTime');
     }
 
     if (this.consecutiveUpdates >= 5 &&
@@ -402,7 +395,8 @@ export default class PlaybackWatcher {
    * @private
    */
   waiting_() {
-    if (this.techWaiting_()) {
+    this.simpleLog('waiting_');
+    if (this.techWaiting_('from waiting')) {
       return;
     }
 
@@ -420,6 +414,7 @@ export default class PlaybackWatcher {
     // make sure there is ~3 seconds of forward buffer before taking any corrective action
     // to avoid triggering an `unknownwaiting` event when the network is slow.
     if (currentRange.length && currentTime + 3 <= currentRange.end(0)) {
+      this.simpleLog('throwing unknown-waiting error');
       this.cancelTimer_();
       this.tech_.setCurrentTime(currentTime);
 
@@ -438,8 +433,16 @@ export default class PlaybackWatcher {
    *         checks passed
    * @private
    */
-  techWaiting_() {
-    this.simpleLog('techWaiting_');
+  techWaiting_(from) {
+    if (from === 'from waiting') {
+      this.simpleLog(`techWaiting_ ${from}`);
+      console.log('this.tech_.seeking(): ', this.tech_.seeking());
+      console.log('this.fixesBadSeeks_(): ', this.fixesBadSeeks_());
+      console.log('this.timer_ !== null: ', this.timer_ !== null);
+      console.log('this.beforeSeekableWindow_(seekable, currentTime): ', this.beforeSeekableWindow_(seekable, currentTime));
+      console.log('seekable: ', seekable);
+      console.log('currentTime: ', currentTime);      
+    }
     const seekable = this.seekable();
     const currentTime = this.tech_.currentTime();
 
