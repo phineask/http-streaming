@@ -264,10 +264,8 @@ export default class PlaybackWatcher {
    */
   checkCurrentTime_() {
     if (this.tech_.seeking() && this.fixesBadSeeks_()) {
-      this.simpleLog("seeking and fixesBadSeeks");
       this.consecutiveUpdates = 0;
       this.lastRecordedTime = this.tech_.currentTime();
-      this.simpleLog(`setting lastRecordedTime: ${this.tech_.currentTime()}`);
       return;
     }
 
@@ -394,7 +392,6 @@ export default class PlaybackWatcher {
    * @private
    */
   waiting_() {
-    this.simpleLog('waiting_');
     if (this.techWaiting_('from waiting')) {
       return;
     }
@@ -418,8 +415,8 @@ export default class PlaybackWatcher {
       this.tech_.setCurrentTime(currentTime);
 
       this.simpleLog(`Stopped at ${currentTime} while inside a buffered region ` +
-        `[${currentRange.start(0)} -> ${currentRange.end(0)}]. Attempting to resume ` +
-        'playback by seeking to the current time.');
+        `[${currentRange.start(0)} -> ${currentRange.end(0)}] because ${currentTime + 3} <= ${currentRange.end(0)}. Attempting to resume ` +
+        `playback by seeking to the current time (${currentTime}).`);
 
       // unknown waiting corrections may be useful for monitoring QoS
       this.tech_.trigger({type: 'usage', name: 'vhs-unknown-waiting'});
@@ -462,11 +459,8 @@ export default class PlaybackWatcher {
     }
 
     if (this.beforeSeekableWindow_(seekable, currentTime)) {
-      this.simpleLog('beforeSeekableWindow_');
       const livePoint = seekable.end(seekable.length - 1);
 
-      this.logger_(`Fell out of live window at time ${currentTime}. Seeking to ` +
-                   `live point (seekable end) ${livePoint}`);
       this.simpleLog(`Fell out of live window at time ${currentTime}. Seeking to ` +
                    `live point (seekable end) ${livePoint}`);
       
@@ -523,9 +517,8 @@ export default class PlaybackWatcher {
       return true;
     }
 
-
-    this.simpleLog('was unable to correct the waiting issue');
-
+    this.simpleLog(`was unable to correct the waiting issue ${from}, this will now seek to the currentTime to resolve it`);
+    
     // All checks failed. Returning false to indicate failure to correct waiting
     return false;
   }
