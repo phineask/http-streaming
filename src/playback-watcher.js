@@ -433,17 +433,17 @@ export default class PlaybackWatcher {
    * @private
    */
   techWaiting_(from) {
-    if (from === 'from waiting') {
-      this.simpleLog(`techWaiting_ ${from}`);
-      console.log('this.tech_.seeking(): ', this.tech_.seeking());
-      console.log('this.fixesBadSeeks_(): ', this.fixesBadSeeks_());
-      console.log('this.timer_ !== null: ', this.timer_ !== null);
-      console.log('this.beforeSeekableWindow_(seekable, currentTime): ', this.beforeSeekableWindow_(seekable, currentTime));
-      console.log('seekable: ', seekable);
-      console.log('currentTime: ', currentTime);
-    }
     const seekable = this.seekable();
     const currentTime = this.tech_.currentTime();
+
+    if (from === 'from waiting') {
+      this.simpleLog(`techWaiting_ ${from}`);
+      this.simpleLog(`this.tech_.seeking(): ${this.tech_.seeking()}`);
+      this.simpleLog(`this.fixesBadSeeks_(): ${this.fixesBadSeeks_()}`);
+      this.simpleLog(`this.timer_ : ${this.timer_}`);
+      this.simpleLog(`seekable: ${seekable}`);
+      this.simpleLog(`currentTime: ${currentTime}`);
+    }
 
     if (this.tech_.seeking() && this.fixesBadSeeks_()) {
       // Tech is seeking or bad seek fixed, no action needed
