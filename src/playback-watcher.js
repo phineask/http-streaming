@@ -272,7 +272,6 @@ export default class PlaybackWatcher {
     }
 
     if (this.tech_.paused() || this.tech_.seeking()) {
-      this.simpleLog(`paused or seeking`);
       return;
     }
 
@@ -441,7 +440,7 @@ export default class PlaybackWatcher {
       console.log('this.timer_ !== null: ', this.timer_ !== null);
       console.log('this.beforeSeekableWindow_(seekable, currentTime): ', this.beforeSeekableWindow_(seekable, currentTime));
       console.log('seekable: ', seekable);
-      console.log('currentTime: ', currentTime);      
+      console.log('currentTime: ', currentTime);
     }
     const seekable = this.seekable();
     const currentTime = this.tech_.currentTime();
@@ -468,6 +467,8 @@ export default class PlaybackWatcher {
                    `live point (seekable end) ${livePoint}`);
       
       this.cancelTimer_();
+                   
+      // NOTE: This could be the culprit in causing this to jump?
       this.tech_.setCurrentTime(livePoint);
 
       // live window resyncs may be useful for monitoring QoS
@@ -485,7 +486,6 @@ export default class PlaybackWatcher {
     });
 
     if (videoUnderflow) {
-      this.simpleLog('videoUnderflow');
       // Even though the video underflowed and was stuck in a gap, the audio overplayed
       // the gap, leading currentTime into a buffered range. Seeking to currentTime
       // allows the video to catch up to the audio position without losing any audio
@@ -502,7 +502,6 @@ export default class PlaybackWatcher {
 
     // check for gap
     if (nextRange.length > 0) {
-      this.simpleLog('check gap');
       const difference = nextRange.start(0) - currentTime;
 
       this.logger_(`Stopped at ${currentTime}, setting timer for ${difference}, seeking ` +
