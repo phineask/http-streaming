@@ -83,6 +83,7 @@ export default class PlaybackWatcher {
     this.timer_ = null;
     this.checkCurrentTimeTimeout_ = null;
     this.logger_ = logger('PlaybackWatcher');
+    
 
     this.logger_('initialize');
 
@@ -396,6 +397,11 @@ export default class PlaybackWatcher {
       return;
     }
 
+    // Attempt to nudge buffer
+    if (this.tryNudgeBuffer_()) {
+      return;
+    }
+    
     // All tech waiting checks failed. Use last resort correction
     const currentTime = this.tech_.currentTime();
     const buffered = this.tech_.buffered();
@@ -592,6 +598,46 @@ export default class PlaybackWatcher {
       return true;
     }
 
+    return false;
+  }
+
+  /**
+   * Attempt to nudge the playback region, in case of a stalled player,
+   * that may be able to skip forwards past a gap
+   *
+   * @private
+   */
+   tryNudgeBuffer_() {
+    console.wanr('tryNudgeBuffer_: ', this.nudgeRetry);
+    const currentTime = this.tech_.currentTime();
+
+    // Increment the nudge retry (and initialize if it is not set)
+    const nudgeRetry = (this.nudgeRetry || 0) + 1;
+    this.nudgeRetry = nudgeRetry;
+
+    // TODO: Allow the player to configure these options
+    const config = {
+      nudgeMaxRetry: 3,
+      nudgeOffset: 0.1
+    };
+
+    if (nudgeRetry < config.nudgeMaxRetry) {
+      const targetTime = currentTime + nudgeRetry * config.nudgeOffset;
+      // Playback stalled in buffered area ... let's nudge currentTime to try to overcome this
+      console.warn(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
+
+      this.player.currentTime(targetTime);
+
+      this.logger_(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
+
+      // An attempt was made to nudge the player, so return true
+      return true;
+    } else {
+      this.logger_(
+        `Playhead still not moving while enough data buffered @${currentTime} after ${config.nudgeMaxRetry} nudges`
+      );
+    }
+    // Unable to nudge the player or have exceeded attempts, so return false
     return false;
   }
 
