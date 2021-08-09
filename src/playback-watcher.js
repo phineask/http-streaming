@@ -608,7 +608,8 @@ export default class PlaybackWatcher {
    * @private
    */
    tryNudgeBuffer_() {
-    console.wanr('tryNudgeBuffer_: ', this.nudgeRetry);
+    simpleLog(`tryNudgeBuffer_: ${this.nudgeRetry}`);
+
     const currentTime = this.tech_.currentTime();
 
     // Increment the nudge retry (and initialize if it is not set)
@@ -624,15 +625,15 @@ export default class PlaybackWatcher {
     if (nudgeRetry < config.nudgeMaxRetry) {
       const targetTime = currentTime + nudgeRetry * config.nudgeOffset;
       // Playback stalled in buffered area ... let's nudge currentTime to try to overcome this
-      console.warn(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
-
       this.player.currentTime(targetTime);
 
+      simpleLog(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
       this.logger_(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
 
       // An attempt was made to nudge the player, so return true
       return true;
     } else {
+      simpleLog(`Playhead still not moving while enough data buffered @${currentTime} after ${config.nudgeMaxRetry} nudges`);
       this.logger_(
         `Playhead still not moving while enough data buffered @${currentTime} after ${config.nudgeMaxRetry} nudges`
       );
