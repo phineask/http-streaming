@@ -6,7 +6,7 @@
   "module": "dist/videojs-http-streaming.es.js",
   "repository": {
     "type": "git",
-    "url": "git@github.com:videojs/http-streaming.git"
+    "url": "git@github.com:phineask/http-streaming.git"
   },
   "scripts": {
     "prenetlify": "npm run build",
