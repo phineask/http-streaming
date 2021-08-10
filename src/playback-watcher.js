@@ -270,7 +270,7 @@ export default class PlaybackWatcher {
 
     if (this.lastRecordedTime === currentTime &&
         (!buffered.length ||
-         currentTime + Ranges.SAFE_TIME_DELTA >= buffered.end(buffered.length - 1))) {      
+         currentTime + Ranges.SAFE_TIME_DELTA >= buffered.end(buffered.length - 1))) {
       // If current time is at the end of the final buffered region, then any playback
       // stall is most likely caused by buffering in a low bandwidth environment. The tech
       // should fire a `waiting` event in this scenario, but due to browser and tech
@@ -411,8 +411,8 @@ export default class PlaybackWatcher {
       this.tech_.setCurrentTime(currentTime);
 
       this.logger_(`Stopped at ${currentTime} while inside a buffered region ` +
-        `[${currentRange.start(0)} -> ${currentRange.end(0)}] because ${currentTime + 3} <= ${currentRange.end(0)}. Attempting to resume ` +
-        `playback by seeking to the current time (${currentTime}).`);
+        `[${currentRange.start(0)} -> ${currentRange.end(0)}]. Attempting to resume ` +
+        'playback by seeking to the current time.');
 
       // unknown waiting corrections may be useful for monitoring QoS
       this.tech_.trigger({type: 'usage', name: 'vhs-unknown-waiting'});
@@ -448,9 +448,7 @@ export default class PlaybackWatcher {
 
       this.logger_(`Fell out of live window at time ${currentTime}. Seeking to ` +
                    `live point (seekable end) ${livePoint}`);
-      
       this.cancelTimer_();
-                   
       this.tech_.setCurrentTime(livePoint);
 
       // live window resyncs may be useful for monitoring QoS
@@ -488,8 +486,6 @@ export default class PlaybackWatcher {
 
       this.logger_(`Stopped at ${currentTime}, setting timer for ${difference}, seeking ` +
         `to ${nextRange.start(0)}`);
-      this.simpleLog(`Stopped at ${currentTime}, setting timer for ${difference}, seeking ` +
-        `to ${nextRange.start(0)}`);
 
       this.cancelTimer_();
 
@@ -501,8 +497,6 @@ export default class PlaybackWatcher {
       return true;
     }
 
-    this.simpleLog(`was unable to correct the waiting issue ${from}, this will now seek to the currentTime to resolve it`);
-    
     // All checks failed. Returning false to indicate failure to correct waiting
     return false;
   }
