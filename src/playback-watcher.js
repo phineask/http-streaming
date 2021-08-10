@@ -77,19 +77,20 @@ export default class PlaybackWatcher {
     this.allowSeeksWithinUnsafeLiveWindow = options.allowSeeksWithinUnsafeLiveWindow;
     this.liveRangeSafeTimeDelta = options.liveRangeSafeTimeDelta;
     this.media = options.media;
+    this.nudgeOffset = options.nudgeOffset;
+    this.enableNudgeOnError = options.enableNudgeOnError;
 
     this.consecutiveUpdates = 0;
     this.lastRecordedTime = null;
     this.timer_ = null;
     this.checkCurrentTimeTimeout_ = null;
     this.logger_ = logger('PlaybackWatcher');
-    
 
     this.logger_('initialize');
 
     const playHandler = () => this.monitorCurrentTime_();
     const canPlayHandler = () => this.monitorCurrentTime_();
-    const waitingHandler = () => this.techWaiting_('from waitingHandler');
+    const waitingHandler = () => this.techWaiting_();
     const cancelTimerHandler = () => this.cancelTimer_();
     const fixesBadSeeksHandler = () => this.fixesBadSeeks_();
 
@@ -153,16 +154,6 @@ export default class PlaybackWatcher {
       }
       this.cancelTimer_();
     };
-  }
-
-  /**
-   * DEBUG LOGGING FUNCTION
-   *
-   * @private
-   */
-  simpleLog(msg) {
-    // eslint-disable-next-line
-    console.warn(`DEBUG: ${msg}`)
   }
 
   /**
@@ -285,7 +276,7 @@ export default class PlaybackWatcher {
       // should fire a `waiting` event in this scenario, but due to browser and tech
       // inconsistencies. Calling `techWaiting_` here allows us to simulate
       // responding to a native `waiting` event when the tech fails to emit one.
-      return this.techWaiting_('from checkCurrentTime');
+      return this.techWaiting_();
     }
 
     if (this.consecutiveUpdates >= 5 &&
@@ -393,13 +384,13 @@ export default class PlaybackWatcher {
    * @private
    */
   waiting_() {
-    if (this.techWaiting_('from waiting')) {
+    if (this.techWaiting_()) {
       return;
     }
 
     // Attempt to nudge buffer
-    if (this.tryNudgeBuffer_()) {
-      return;
+    if (this.enableNudgeOnError) {
+      this.tryNudgeToResolveGap();
     }
     
     // All tech waiting checks failed. Use last resort correction
@@ -416,11 +407,10 @@ export default class PlaybackWatcher {
     // make sure there is ~3 seconds of forward buffer before taking any corrective action
     // to avoid triggering an `unknownwaiting` event when the network is slow.
     if (currentRange.length && currentTime + 3 <= currentRange.end(0)) {
-      this.simpleLog('throwing unknown-waiting error');
       this.cancelTimer_();
       this.tech_.setCurrentTime(currentTime);
 
-      this.simpleLog(`Stopped at ${currentTime} while inside a buffered region ` +
+      this.logger_(`Stopped at ${currentTime} while inside a buffered region ` +
         `[${currentRange.start(0)} -> ${currentRange.end(0)}] because ${currentTime + 3} <= ${currentRange.end(0)}. Attempting to resume ` +
         `playback by seeking to the current time (${currentTime}).`);
 
@@ -439,40 +429,28 @@ export default class PlaybackWatcher {
    *         checks passed
    * @private
    */
-  techWaiting_(from) {
+  techWaiting_() {
     const seekable = this.seekable();
     const currentTime = this.tech_.currentTime();
 
-    if (from === 'from waiting') {
-      this.simpleLog(`techWaiting_ ${from}`);
-      this.simpleLog(`this.tech_.seeking(): ${this.tech_.seeking()}`);
-      this.simpleLog(`this.fixesBadSeeks_(): ${this.fixesBadSeeks_()}`);
-      this.simpleLog(`this.timer_ : ${this.timer_}`);
-      this.simpleLog(`seekable: ${seekable}`);
-      this.simpleLog(`currentTime: ${currentTime}`);
-    }
-
     if (this.tech_.seeking() && this.fixesBadSeeks_()) {
       // Tech is seeking or bad seek fixed, no action needed
-      this.simpleLog('Tech is seeking or bad seek fixed, no action needed');
       return true;
     }
 
     if (this.tech_.seeking() || this.timer_ !== null) {
       // Tech is seeking or already waiting on another action, no action needed
-      this.simpleLog('Tech is seeking or already waiting on another action, no action needed');
       return true;
     }
 
     if (this.beforeSeekableWindow_(seekable, currentTime)) {
       const livePoint = seekable.end(seekable.length - 1);
 
-      this.simpleLog(`Fell out of live window at time ${currentTime}. Seeking to ` +
+      this.logger_(`Fell out of live window at time ${currentTime}. Seeking to ` +
                    `live point (seekable end) ${livePoint}`);
       
       this.cancelTimer_();
                    
-      // NOTE: This could be the culprit in causing this to jump?
       this.tech_.setCurrentTime(livePoint);
 
       // live window resyncs may be useful for monitoring QoS
@@ -602,44 +580,19 @@ export default class PlaybackWatcher {
   }
 
   /**
-   * Attempt to nudge the playback region, in case of a stalled player,
-   * that may be able to skip forwards past a gap
+   * Attempt to nudge the playback region in case of a stalled player,
+   * to try skip forwards past the gap
    *
    * @private
    */
-   tryNudgeBuffer_() {
-    simpleLog(`tryNudgeBuffer_: ${this.nudgeRetry}`);
-
+   tryNudgeToResolveGap() {
     const currentTime = this.tech_.currentTime();
+    const targetTime = currentTime + this.nudgeOffset;
 
-    // Increment the nudge retry (and initialize if it is not set)
-    const nudgeRetry = (this.nudgeRetry || 0) + 1;
-    this.nudgeRetry = nudgeRetry;
+    // Playback stalled in buffered area ... let's nudge currentTime to try to overcome this
+    this.player.currentTime(targetTime);
 
-    // TODO: Allow the player to configure these options
-    const config = {
-      nudgeMaxRetry: 3,
-      nudgeOffset: 0.1
-    };
-
-    if (nudgeRetry < config.nudgeMaxRetry) {
-      const targetTime = currentTime + nudgeRetry * config.nudgeOffset;
-      // Playback stalled in buffered area ... let's nudge currentTime to try to overcome this
-      this.player.currentTime(targetTime);
-
-      simpleLog(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
-      this.logger_(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
-
-      // An attempt was made to nudge the player, so return true
-      return true;
-    } else {
-      simpleLog(`Playhead still not moving while enough data buffered @${currentTime} after ${config.nudgeMaxRetry} nudges`);
-      this.logger_(
-        `Playhead still not moving while enough data buffered @${currentTime} after ${config.nudgeMaxRetry} nudges`
-      );
-    }
-    // Unable to nudge the player or have exceeded attempts, so return false
-    return false;
+    this.logger_(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
   }
 
   /**

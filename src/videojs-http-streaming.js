@@ -733,6 +733,8 @@ class VhsHandler extends Component {
       }
     );
 
+    console.warn('playbackWatcherOptions: ', playbackWatcherOptions);
+
     this.playbackWatcher_ = new PlaybackWatcher(playbackWatcherOptions);
 
     this.masterPlaylistController_.on('error', () => {
