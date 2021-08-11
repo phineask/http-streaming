@@ -581,12 +581,15 @@ export default class PlaybackWatcher {
    */
    tryNudgeToResolveGap() {
     const currentTime = this.tech_.currentTime();
+    const buffered = this.tech_.buffered();
+    const currentRange = Ranges.findRange(buffered, currentTime);
     const targetTime = currentTime + this.nudgeOffset;
 
-    // Playback stalled in buffered area ... let's nudge currentTime to try to overcome this
-    this.player.currentTime(targetTime);
-
-    this.logger_(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
+    // Playback stalled in buffered area... let's nudge currentTime to try to overcome this
+    if (currentRange.length && targetTime <= currentRange.end(0)) {
+      this.tech_.currentTime(targetTime);
+      this.logger_(`Nudging 'currentTime' from ${currentTime} to ${targetTime}`);
+    }
   }
 
   /**
